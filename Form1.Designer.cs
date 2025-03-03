@@ -35,10 +35,6 @@
             startToolStripMenuItem = new ToolStripMenuItem();
             stopToolStripMenuItem = new ToolStripMenuItem();
             pauseToolStripMenuItem = new ToolStripMenuItem();
-            videoToolStripMenuItem = new ToolStripMenuItem();
-            startToolStripMenuItem1 = new ToolStripMenuItem();
-            stopToolStripMenuItem1 = new ToolStripMenuItem();
-            pauseToolStripMenuItem1 = new ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             menuStrip1.SuspendLayout();
             SuspendLayout();
@@ -63,7 +59,7 @@
             // 
             // fileToolStripMenuItem
             // 
-            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { cameraToolStripMenuItem, videoToolStripMenuItem });
+            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { cameraToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new Size(37, 20);
             fileToolStripMenuItem.Text = "File";
@@ -72,54 +68,29 @@
             // 
             cameraToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { startToolStripMenuItem, stopToolStripMenuItem, pauseToolStripMenuItem });
             cameraToolStripMenuItem.Name = "cameraToolStripMenuItem";
-            cameraToolStripMenuItem.Size = new Size(115, 22);
+            cameraToolStripMenuItem.Size = new Size(180, 22);
             cameraToolStripMenuItem.Text = "Camera";
             // 
             // startToolStripMenuItem
             // 
             startToolStripMenuItem.Name = "startToolStripMenuItem";
-            startToolStripMenuItem.Size = new Size(105, 22);
+            startToolStripMenuItem.Size = new Size(180, 22);
             startToolStripMenuItem.Text = "Start";
             startToolStripMenuItem.Click += startToolStripMenuItem_Click;
             // 
             // stopToolStripMenuItem
             // 
             stopToolStripMenuItem.Name = "stopToolStripMenuItem";
-            stopToolStripMenuItem.Size = new Size(105, 22);
+            stopToolStripMenuItem.Size = new Size(180, 22);
             stopToolStripMenuItem.Text = "Stop";
             stopToolStripMenuItem.Click += stopToolStripMenuItem_Click;
             // 
             // pauseToolStripMenuItem
             // 
             pauseToolStripMenuItem.Name = "pauseToolStripMenuItem";
-            pauseToolStripMenuItem.Size = new Size(105, 22);
+            pauseToolStripMenuItem.Size = new Size(180, 22);
             pauseToolStripMenuItem.Text = "Pause";
             pauseToolStripMenuItem.Click += pauseToolStripMenuItem_Click;
-            // 
-            // videoToolStripMenuItem
-            // 
-            videoToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { startToolStripMenuItem1, stopToolStripMenuItem1, pauseToolStripMenuItem1 });
-            videoToolStripMenuItem.Name = "videoToolStripMenuItem";
-            videoToolStripMenuItem.Size = new Size(115, 22);
-            videoToolStripMenuItem.Text = "Video";
-            // 
-            // startToolStripMenuItem1
-            // 
-            startToolStripMenuItem1.Name = "startToolStripMenuItem1";
-            startToolStripMenuItem1.Size = new Size(105, 22);
-            startToolStripMenuItem1.Text = "Start";
-            // 
-            // stopToolStripMenuItem1
-            // 
-            stopToolStripMenuItem1.Name = "stopToolStripMenuItem1";
-            stopToolStripMenuItem1.Size = new Size(105, 22);
-            stopToolStripMenuItem1.Text = "Stop";
-            // 
-            // pauseToolStripMenuItem1
-            // 
-            pauseToolStripMenuItem1.Name = "pauseToolStripMenuItem1";
-            pauseToolStripMenuItem1.Size = new Size(105, 22);
-            pauseToolStripMenuItem1.Text = "Pause";
             // 
             // Form1
             // 
@@ -147,9 +118,5 @@
         private ToolStripMenuItem startToolStripMenuItem;
         private ToolStripMenuItem stopToolStripMenuItem;
         private ToolStripMenuItem pauseToolStripMenuItem;
-        private ToolStripMenuItem videoToolStripMenuItem;
-        private ToolStripMenuItem startToolStripMenuItem1;
-        private ToolStripMenuItem stopToolStripMenuItem1;
-        private ToolStripMenuItem pauseToolStripMenuItem1;
     }
 }

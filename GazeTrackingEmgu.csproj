@@ -14,4 +14,29 @@
     <PackageReference Include="Emgu.CV.runtime.windows" Version="4.10.0.5680" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="haarcascades\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="haarcascades\haarcascade_eye.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="haarcascades\haarcascade_eye_tree_eyeglasses.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="haarcascades\haarcascade_frontalface_default.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="haarcascades\haarcascade_lefteye_2splits.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="haarcascades\haarcascade_profileface.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="haarcascades\haarcascade_righteye_2splits.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

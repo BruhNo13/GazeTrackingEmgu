@@ -191,7 +191,7 @@ namespace GazeTrackingEmgu
                                 if (pupilShiftX < 0.3)  
                                     direction = "Doprava";
                                 else if (pupilShiftX > 0.7)  
-                                    direction = "Do¾ava";
+                                    direction = "Dolava";
 
                                
                                 double pupilShiftY = (double)centerY / eyeHeight;
@@ -200,10 +200,10 @@ namespace GazeTrackingEmgu
                                 else if (centerY < eyeHeight * 0.3)
                                     direction = "Hore";
 
-                                Console.WriteLine($"Smer poh¾adu: {direction}");
+                                Console.WriteLine($"Smer pohladu: {direction}");
 
                                 
-                                if (direction == "Doprava" || direction == "Do¾ava") 
+                                if (direction == "Doprava" || direction == "Dolava") 
                                 {
                                     if (lastDirection == direction)
                                     {
@@ -259,7 +259,7 @@ namespace GazeTrackingEmgu
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Chyba pri detekcii poh¾adu: " + ex.Message);
+                Console.WriteLine("Chyba pri detekcii pohladu: " + ex.Message);
             }
         }
 

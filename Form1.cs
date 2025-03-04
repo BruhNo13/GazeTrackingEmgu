@@ -53,7 +53,7 @@ namespace GazeTrackingEmgu
         {
             if (!_isRunning)
             {
-                _videoCapture = new VideoCapture();
+                _videoCapture = new VideoCapture(0);
                 _videoCapture.ImageGrabbed += ProcessFrame;
                 _videoCapture.Start();
                 _isRunning = true;
@@ -94,40 +94,37 @@ namespace GazeTrackingEmgu
                     UMat grayImage = new UMat();
                     CvInvoke.CvtColor(image, grayImage, ColorConversion.Bgr2Gray);
 
-                    
                     Rectangle[] faces = _faceCascade.DetectMultiScale(grayImage, 1.1, 4);
+                    if (faces.Length == 0) return;
 
-                    foreach (Rectangle face in faces)
-                    {
-                        CvInvoke.Rectangle(image, face, new MCvScalar(0, 255, 0), 2); 
+                    Rectangle face = faces.OrderByDescending(f => f.Width * f.Height).First();
+                    if (face.Width < image.Width / 6) return;
 
-                        Mat faceROI = new Mat(frame, face);
+                    CvInvoke.Rectangle(image, face, new MCvScalar(0, 255, 0), 2);
 
-                        
-                        Rectangle[] eyes = _eyeCascade.DetectMultiScale(faceROI, 1.1, 4);
+                    Mat faceROI = new Mat(frame, face);
+                    Rectangle[] eyes = _eyeCascade.DetectMultiScale(faceROI, 1.1, 4);
+                    if (eyes.Length < 2) return;
 
-                        if (eyes.Length < 2)
-                            continue; 
+                    var sortedEyes = eyes.OrderByDescending(e => e.Width * e.Height).Take(2).ToArray();
+                    Rectangle leftEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[0] : sortedEyes[1];
+                    Rectangle rightEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[1] : sortedEyes[0];
 
-                        
-                        var sortedEyes = eyes.OrderByDescending(e => e.Width * e.Height).Take(2).ToArray();
-                        Rectangle leftEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[0] : sortedEyes[1];
-                        Rectangle rightEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[1] : sortedEyes[0];
+                    // **Zmenšíme výšku oblasti oka**
+                    int reducedHeight = (int)(leftEye.Height * 0.55); // Berieme iba spodnú polovicu oka
+                    leftEye = new Rectangle(face.X + leftEye.X, face.Y + leftEye.Y + reducedHeight / 2, leftEye.Width, reducedHeight);
+                    rightEye = new Rectangle(face.X + rightEye.X, face.Y + rightEye.Y + reducedHeight / 2, rightEye.Width, reducedHeight);
 
-                        
-                        leftEye = new Rectangle(face.X + leftEye.X, face.Y + leftEye.Y, leftEye.Width, leftEye.Height);
-                        rightEye = new Rectangle(face.X + rightEye.X, face.Y + rightEye.Y, rightEye.Width, rightEye.Height);
+                    CvInvoke.Rectangle(image, leftEye, new MCvScalar(255, 0, 0), 2);
+                    CvInvoke.Rectangle(image, rightEye, new MCvScalar(255, 0, 0), 2);
 
-                        
-                        CvInvoke.Rectangle(image, leftEye, new MCvScalar(255, 0, 0), 2);
-                        CvInvoke.Rectangle(image, rightEye, new MCvScalar(255, 0, 0), 2);
+                    DrawEyeThresholdLines(image, leftEye);
+                    DrawEyeThresholdLines(image, rightEye);
 
-                       
-                        Mat leftEyeROI = new Mat(frame, leftEye);
-                        Mat rightEyeROI = new Mat(frame, rightEye);
-                        DetectEyeDirection(image, leftEyeROI, face, leftEye, rightEye);
-                        DetectEyeDirection(image, rightEyeROI, face, leftEye, rightEye);
-                    }
+                    Mat leftEyeROI = new Mat(frame, leftEye);
+                    Mat rightEyeROI = new Mat(frame, rightEye);
+                    DetectEyeDirection(image, leftEyeROI, leftEye);
+                    DetectEyeDirection(image, rightEyeROI, rightEye);
 
                     pictureBox1.Invoke((MethodInvoker)(() =>
                     {
@@ -142,118 +139,86 @@ namespace GazeTrackingEmgu
         }
 
 
-
-        private void DetectEyeDirection(Image<Bgr, byte> image, Mat eyeROI, Rectangle face, Rectangle leftEye, Rectangle rightEye)
+        private void DetectEyeDirection(Image<Bgr, byte> image, Mat eyeROI, Rectangle eyeRect)
         {
             try
             {
                 UMat grayEye = new UMat();
                 CvInvoke.CvtColor(eyeROI, grayEye, ColorConversion.Bgr2Gray);
-                CvInvoke.GaussianBlur(grayEye, grayEye, new Size(3, 3), 0);
 
-                
+                CvInvoke.EqualizeHist(grayEye, grayEye);
+
+                CvInvoke.GaussianBlur(grayEye, grayEye, new Size(5, 5), 0);
+
                 UMat thresholdEye = new UMat();
-                CvInvoke.Threshold(grayEye, thresholdEye, 30, 255, ThresholdType.BinaryInv);
+                CvInvoke.Threshold(grayEye, thresholdEye, 50, 255, ThresholdType.BinaryInv);
 
                 using (VectorOfVectorOfPoint contours = new VectorOfVectorOfPoint())
                 {
                     CvInvoke.FindContours(thresholdEye, contours, null, RetrType.External, ChainApproxMethod.ChainApproxSimple);
-                    if (contours.Size > 0)
-                    {
-                        double maxArea = 0;
-                        int maxIndex = -1;
 
-                        for (int i = 0; i < contours.Size; i++)
+                    if (contours.Size == 0)
+                    {
+                        Console.WriteLine("Žiadne kontúry neboli nájdené!");
+                        return;
+                    }
+
+                    double maxArea = 0;
+                    int maxIndex = -1;
+                    Rectangle boundingRect = new Rectangle();
+
+                    for (int i = 0; i < contours.Size; i++)
+                    {
+                        double area = CvInvoke.ContourArea(contours[i]);
+                        Rectangle tempRect = CvInvoke.BoundingRectangle(contours[i]);
+
+                        if (area > 50 && area < eyeROI.Width * eyeROI.Height * 0.4)
                         {
-                            double area = CvInvoke.ContourArea(contours[i]);
-                            if (area > maxArea && area > 5) 
+                            if (area > maxArea)
                             {
                                 maxArea = area;
                                 maxIndex = i;
+                                boundingRect = tempRect;
                             }
                         }
+                    }
 
-                        if (maxIndex != -1)
+                    if (maxIndex != -1)
+                    {
+                        Moments moments = CvInvoke.Moments(contours[maxIndex]);
+                        if (moments.M00 != 0)
                         {
-                            Moments moments = CvInvoke.Moments(contours[maxIndex]);
-                            if (moments.M00 != 0)
-                            {
-                                int centerX = (int)(moments.M10 / moments.M00);
-                                int centerY = (int)(moments.M01 / moments.M00);
-                                int eyeWidth = eyeROI.Width;
-                                int eyeHeight = eyeROI.Height;
+                            int centerX = (int)(moments.M10 / moments.M00);
+                            int centerY = (int)(moments.M01 / moments.M00);
 
-                                string direction = "Monitor";
+                            CvInvoke.Circle(image, new Point(eyeRect.X + centerX, eyeRect.Y + centerY), 3, new MCvScalar(255, 0, 0), -1);
 
-                                
-                                double pupilShiftX = (double)centerX / eyeWidth; 
+                            int eyeWidth = eyeROI.Width;
+                            int eyeHeight = eyeROI.Height;
+                            string direction = "Monitor";
 
-                                if (pupilShiftX < 0.3)  
-                                    direction = "Doprava";
-                                else if (pupilShiftX > 0.7)  
-                                    direction = "Do¾ava";
+                            double pupilShiftX = (double)centerX / eyeWidth;
+                            if (pupilShiftX < 0.3)
+                                direction = "Doprava";
+                            else if (pupilShiftX > 0.7)
+                                direction = "Do¾ava";
 
-                               
-                                double pupilShiftY = (double)centerY / eyeHeight;
-                                if (centerY > eyeHeight * 0.6)
-                                    direction = "Dole";
-                                else if (centerY < eyeHeight * 0.3)
-                                    direction = "Hore";
+                            double pupilShiftY = (double)centerY / eyeHeight;
+                            if (pupilShiftY > 0.6)
+                                direction = "Dole";
+                            else if (pupilShiftY < 0.3)
+                                direction = "Hore";
 
-                                Console.WriteLine($"Smer poh¾adu: {direction}");
+                            Console.WriteLine($"Smer poh¾adu: {direction}");
 
-                                
-                                if (direction == "Doprava" || direction == "Do¾ava") 
-                                {
-                                    if (lastDirection == direction)
-                                    {
-                                        if (!gazeTimer.IsRunning)
-                                            gazeTimer.Start();
+                            CvInvoke.Rectangle(image, eyeRect, new MCvScalar(0, 255, 0), 2);
 
-                                        if (gazeTimer.ElapsedMilliseconds > 1000) 
-                                        {
-                                            Invoke((MethodInvoker)(() =>
-                                            {
-                                                MessageBox.Show($"Upozornenie: {direction}!", "Gaze Tracking", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                            }));
-                                            gazeTimer.Reset();
-                                        }
-                                    }
-                                    else
-                                    {
-                                        lastDirection = direction;
-                                        gazeTimer.Reset();
-                                    }
-                                }
-                                else if (direction != "Monitor") 
-                                {
-                                    if (lastDirection == direction)
-                                    {
-                                        if (!gazeTimer.IsRunning)
-                                            gazeTimer.Start();
-
-                                        if (gazeTimer.ElapsedMilliseconds > 2000)
-                                        {
-                                            Invoke((MethodInvoker)(() =>
-                                            {
-                                                MessageBox.Show($"Upozornenie: {direction}!", "Gaze Tracking", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                            }));
-                                            gazeTimer.Reset();
-                                        }
-                                    }
-                                    else
-                                    {
-                                        lastDirection = direction;
-                                        gazeTimer.Reset();
-                                    }
-                                }
-                                else
-                                {
-                                    gazeTimer.Reset();
-                                    lastDirection = "Monitor";
-                                }
-                            }
+                            CvInvoke.Rectangle(image, new Rectangle(eyeRect.X + boundingRect.X, eyeRect.Y + boundingRect.Y, boundingRect.Width, boundingRect.Height), new MCvScalar(255, 0, 0), 2);
                         }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Zrenica nebola nájdená v kontúrach!");
                     }
                 }
             }
@@ -262,6 +227,24 @@ namespace GazeTrackingEmgu
                 Console.WriteLine("Chyba pri detekcii poh¾adu: " + ex.Message);
             }
         }
+
+
+
+
+
+        private void DrawEyeThresholdLines(Image<Bgr, byte> image, Rectangle eye)
+        {
+            int leftThreshold = eye.X + (int)(eye.Width * 0.35);
+            int rightThreshold = eye.X + (int)(eye.Width * 0.65);
+            int topThreshold = eye.Y + (int)(eye.Height * 0.3);
+            int bottomThreshold = eye.Y + (int)(eye.Height * 0.6);
+
+            CvInvoke.Line(image, new Point(leftThreshold, eye.Y), new Point(leftThreshold, eye.Y + eye.Height), new MCvScalar(0, 0, 255), 2);
+            CvInvoke.Line(image, new Point(rightThreshold, eye.Y), new Point(rightThreshold, eye.Y + eye.Height), new MCvScalar(0, 0, 255), 2);
+            CvInvoke.Line(image, new Point(eye.X, topThreshold), new Point(eye.X + eye.Width, topThreshold), new MCvScalar(0, 0, 255), 2);
+            CvInvoke.Line(image, new Point(eye.X, bottomThreshold), new Point(eye.X + eye.Width, bottomThreshold), new MCvScalar(0, 0, 255), 2);
+        }
+
 
 
     }

@@ -46,7 +46,6 @@
             pictureBox1.Size = new Size(628, 331);
             pictureBox1.TabIndex = 0;
             pictureBox1.TabStop = false;
-            pictureBox1.Click += pictureBox1_Click;
             // 
             // menuStrip1
             // 
@@ -90,7 +89,6 @@
             pauseToolStripMenuItem.Name = "pauseToolStripMenuItem";
             pauseToolStripMenuItem.Size = new Size(180, 22);
             pauseToolStripMenuItem.Text = "Pause";
-            pauseToolStripMenuItem.Click += pauseToolStripMenuItem_Click;
             // 
             // Form1
             // 

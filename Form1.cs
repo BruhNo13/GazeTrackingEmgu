@@ -19,13 +19,13 @@ namespace GazeTrackingEmgu
 {
     public partial class Form1 : Form
     {
-        private Stopwatch gazeTimer = new Stopwatch();
-        private string lastDirection = "Monitor";
+        //private Stopwatch gazeTimer = new Stopwatch();
+        //private string lastDirection = "Monitor";
         private VideoCapture _videoCapture;
         private CascadeClassifier _faceCascade;
         private CascadeClassifier _eyeCascade;
-        private int gazeWarnings = 0; 
-        private int falseMonitorCount = 0;
+        //private int gazeWarnings = 0;
+        //private int falseMonitorCount = 0;
         private Stopwatch fpsTimer = new Stopwatch();
         private int frameCount = 0;
         private double fps = 0;
@@ -44,7 +44,7 @@ namespace GazeTrackingEmgu
             if (!_isRunning)
             {
                 _videoCapture = new VideoCapture(0);
-                _videoCapture.ImageGrabbed += ProcessFrame;
+                _videoCapture.ImageGrabbed += ProcessFrameFromCamera;
                 _videoCapture.Start();
                 _isRunning = true;
             }
@@ -72,83 +72,151 @@ namespace GazeTrackingEmgu
             }
         }
 
-        private void ProcessFrame(object sender, EventArgs e)
+        private void playVideoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string videoPath = "D:\\bakalarka\\GazeTrackingEmgu\\videos/gaze_tracking_test.mp4";
+            string csvPath = "D:\\bakalarka\\GazeTrackingEmgu\\videos/gaze_direction.csv";
+            Dictionary<int, string> gazeData = LoadGazeData(csvPath);
+            VideoCapture video = new VideoCapture(videoPath);
+
+            if (!video.IsOpened)
+            {
+                MessageBox.Show("Couldn't open video!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            int frameNumber = 0;
+            int correctDetections = 0;
+            int totalFrames = Math.Min(1772, (int)video.Get(Emgu.CV.CvEnum.CapProp.FrameCount));
+
+            while (frameNumber < totalFrames)
+            {
+                Mat frame = new Mat();
+                video.Read(frame);
+
+                string detectedGaze = ProcessFrame(frame, out Image<Bgr, byte> processedImage);
+                string expectedGaze = gazeData.ContainsKey(frameNumber) ? gazeData[frameNumber] : "unknown";
+                if (expectedGaze != "center") expectedGaze = "away";
+
+                bool correct = detectedGaze == expectedGaze;
+                if (correct) correctDetections++;
+                frameNumber++;
+
+                textBoxGazeStatus.Invoke((MethodInvoker)(() =>
+                {
+                    textBoxGazeStatus.Text = $"Frame: {frameNumber}/{totalFrames} | Detectede: {detectedGaze} | Expected: {expectedGaze} | {(correct ? "yes" : "no")}";
+                }));
+
+                pictureBox1.Invoke((MethodInvoker)(() =>
+                {
+                    if (processedImage != null)
+                    {
+                        pictureBox1.Image = processedImage.Resize(pictureBox1.Width, pictureBox1.Height, Emgu.CV.CvEnum.Inter.Linear).ToBitmap();
+                    }
+                }));
+
+                Application.DoEvents();
+            }
+
+            video.Release();
+
+            double accuracy = (double)correctDetections / totalFrames * 100;
+            MessageBox.Show($"Analysis completed!\nCorrect detections: {correctDetections}/{totalFrames}\nAccuracy: {accuracy:F2}%",
+                            "Results", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private string ProcessFrame(Mat frame, out Image<Bgr, byte> processedImage)
+        {
+            processedImage = frame.ToImage<Bgr, byte>();
+
+            try
+            {
+                UMat grayImage = new UMat();
+                CvInvoke.CvtColor(processedImage, grayImage, ColorConversion.Bgr2Gray);
+
+                Rectangle[] faces = _faceCascade.DetectMultiScale(grayImage, 1.1, 4);
+                if (faces.Length == 0) return "away";
+
+                Rectangle face = faces.OrderByDescending(f => f.Width * f.Height).First();
+                if (face.Width < processedImage.Width / 6) return "away";
+
+                if (showBoundingBoxes)
+                    CvInvoke.Rectangle(processedImage, face, new MCvScalar(0, 255, 0), 2);
+
+                Mat faceROI = new Mat(processedImage.Mat, face);
+                Rectangle[] eyes = _eyeCascade.DetectMultiScale(faceROI, 1.1, 4);
+                if (eyes.Length < 2) return "away";
+
+                var sortedEyes = eyes.OrderByDescending(e => e.Width * e.Height).Take(2).ToArray();
+                Rectangle leftEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[0] : sortedEyes[1];
+                Rectangle rightEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[1] : sortedEyes[0];
+
+                int reducedHeight = (int)(leftEye.Height * 0.55);
+                int reducedWidth = (int)(leftEye.Width * 0.15);
+
+                leftEye = new Rectangle(face.X + leftEye.X + reducedWidth, face.Y + leftEye.Y + reducedHeight / 2, leftEye.Width - (2 * reducedWidth), reducedHeight);
+                rightEye = new Rectangle(face.X + rightEye.X + reducedWidth, face.Y + rightEye.Y + reducedHeight / 2, rightEye.Width - (2 * reducedWidth), reducedHeight);
+
+                string leftGaze = DetectEyeDirection(processedImage, new Mat(processedImage.Mat, leftEye), leftEye);
+                string rightGaze = DetectEyeDirection(processedImage, new Mat(processedImage.Mat, rightEye), rightEye);
+                string detectedGaze = leftGaze == rightGaze ? leftGaze : "away";
+
+                frameCount++;
+                if (!fpsTimer.IsRunning)
+                    fpsTimer.Start();
+                else if (fpsTimer.ElapsedMilliseconds >= 1000)
+                {
+                    fps = frameCount / (fpsTimer.ElapsedMilliseconds / 1000.0);
+                    frameCount = 0;
+                    fpsTimer.Restart();
+                }
+
+                string fpsText = $"FPS: {fps:F1}";
+                CvInvoke.PutText(processedImage, fpsText, new Point(processedImage.Width - 120, 30), FontFace.HersheySimplex, 0.7, new MCvScalar(0, 255, 0), 2);
+
+
+                return detectedGaze;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in ProcessFrame(): " + ex.Message);
+            }
+
+            return "away";
+        }
+
+
+        private void ProcessFrameFromCamera(object sender, EventArgs e)
         {
             try
             {
                 Mat frame = new Mat();
                 _videoCapture.Retrieve(frame);
 
-                using (Image<Bgr, byte> image = frame.ToImage<Bgr, byte>())
+                string gazeResult = ProcessFrame(frame, out Image<Bgr, byte> processedImage);
+
+                textBoxGazeStatus.Invoke((MethodInvoker)(() =>
                 {
-                    UMat grayImage = new UMat();
-                    CvInvoke.CvtColor(image, grayImage, ColorConversion.Bgr2Gray);
+                    textBoxGazeStatus.Text = "Gaze direction: " + gazeResult;
+                }));
 
-                    Rectangle[] faces = _faceCascade.DetectMultiScale(grayImage, 1.1, 4);
-                    if (faces.Length == 0) return;
-
-                    Rectangle face = faces.OrderByDescending(f => f.Width * f.Height).First();
-                    if (face.Width < image.Width / 6) return;
-
-                    if (showBoundingBoxes)
-                        CvInvoke.Rectangle(image, face, new MCvScalar(0, 255, 0), 2);
-
-                    Mat faceROI = new Mat(frame, face);
-                    Rectangle[] eyes = _eyeCascade.DetectMultiScale(faceROI, 1.1, 4);
-                    if (eyes.Length < 2) return;
-
-                    var sortedEyes = eyes.OrderByDescending(e => e.Width * e.Height).Take(2).ToArray();
-                    Rectangle leftEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[0] : sortedEyes[1];
-                    Rectangle rightEye = sortedEyes[0].X < sortedEyes[1].X ? sortedEyes[1] : sortedEyes[0];
-
-                    int reducedHeight = (int)(leftEye.Height * 0.55); 
-                    int reducedWidth = (int)(leftEye.Width * 0.15);
-                    leftEye = new Rectangle(face.X + leftEye.X + reducedWidth, face.Y + leftEye.Y + reducedHeight / 2, leftEye.Width - (2 * reducedWidth), reducedHeight);
-                    rightEye = new Rectangle(face.X + rightEye.X + reducedWidth, face.Y + rightEye.Y + reducedHeight / 2, rightEye.Width - (2 * reducedWidth), reducedHeight);
-
-                    if (showBoundingBoxes)
-                    {
-                        CvInvoke.Rectangle(image, leftEye, new MCvScalar(255, 0, 0), 2);
-                        CvInvoke.Rectangle(image, rightEye, new MCvScalar(255, 0, 0), 2);
-                    }
-
-                    Mat leftEyeROI = new Mat(frame, leftEye);
-                    Mat rightEyeROI = new Mat(frame, rightEye);
-                    DetectEyeDirection(image, leftEyeROI, leftEye);
-                    DetectEyeDirection(image, rightEyeROI, rightEye);
-
-                    frameCount++;
-                    if (!fpsTimer.IsRunning)
-                        fpsTimer.Start();
-                    else if (fpsTimer.ElapsedMilliseconds >= 1000)
-                    {
-                        fps = frameCount / (fpsTimer.ElapsedMilliseconds / 1000.0);
-                        frameCount = 0;
-                        fpsTimer.Restart();
-                    }
-
-                    string fpsText = $"FPS: {fps:F1}";
-                    CvInvoke.PutText(image, fpsText, new Point(image.Width - 120, 30), FontFace.HersheySimplex, 0.7, new MCvScalar(0, 255, 0), 2);
-
-                    pictureBox1.Invoke((MethodInvoker)(() =>
-                    {
-                        pictureBox1.Image = image.ToBitmap();
-                    }));
-                }
+                pictureBox1.Invoke((MethodInvoker)(() =>
+                {
+                    pictureBox1.Image = processedImage.ToBitmap(); 
+                }));
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error: " + ex.Message);
+                Console.WriteLine("Error while processing live video: " + ex.Message);
             }
         }
 
-        private void DetectEyeDirection(Image<Bgr, byte> image, Mat eyeROI, Rectangle eyeRect)
+        private string DetectEyeDirection(Image<Bgr, byte> image, Mat eyeROI, Rectangle eyeRect)
         {
             try
             {
                 UMat grayEye = new UMat();
                 CvInvoke.CvtColor(eyeROI, grayEye, ColorConversion.Bgr2Gray);
-
                 CvInvoke.EqualizeHist(grayEye, grayEye);
 
                 double minVal = 0, maxVal = 0;
@@ -162,11 +230,8 @@ namespace GazeTrackingEmgu
                 {
                     CvInvoke.FindContours(thresholdEye, contours, null, RetrType.External, ChainApproxMethod.ChainApproxSimple);
 
-                    if (contours.Size == 0)
-                    {
-                        Console.WriteLine("No contours found!");
-                        return;
-                    }
+                    if (contours.Size == 0) return "away";
+                    
 
                     double maxArea = 0;
                     int maxIndex = -1;
@@ -221,49 +286,15 @@ namespace GazeTrackingEmgu
 
                         int eyeWidth = eyeROI.Width;
                         int eyeHeight = eyeROI.Height;
-                        string direction = "Screen";
+                        string direction = "center"; 
 
                         double pupilShiftX = (double)(centerX - eyeRect.X) / eyeWidth;
-                        if (pupilShiftX < 0.42) 
-                            direction = "Right";
-                        else if (pupilShiftX > 0.58) 
-                            direction = "Left";
+                        if (pupilShiftX < 0.42 || pupilShiftX > 0.58)  
+                            direction = "away";
 
                         double pupilShiftY = (double)(centerY - eyeRect.Y) / eyeHeight;
-                        if (pupilShiftY > 0.75) 
-                            direction = "Down";
-                        else if (pupilShiftY < 0.25) 
-                            direction = "Up";
-
-                        Console.WriteLine($"Gaze direction: {direction}");
-
-
-                        if (direction != "Screen") 
-                        {
-                            if (!gazeTimer.IsRunning)
-                            {
-                                gazeTimer.Start();
-                                falseMonitorCount = 0; 
-                            }
-                            else if (gazeTimer.ElapsedMilliseconds > 3000) 
-                            {
-                                MessageBox.Show("Look at your screen!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                gazeTimer.Reset(); 
-                            }
-                        }
-                        else 
-                        {
-                            if (gazeTimer.IsRunning)
-                            {
-                                falseMonitorCount++; 
-
-                                if (falseMonitorCount >= 10) 
-                                {
-                                    gazeTimer.Reset(); 
-                                    falseMonitorCount = 0;
-                                }
-                            }
-                        }
+                        if (pupilShiftY > 0.75 || pupilShiftY < 0.25)  
+                            direction = "away";
 
                         if (showBoundingBoxes)
                         {
@@ -279,6 +310,8 @@ namespace GazeTrackingEmgu
                             CvInvoke.Line(image, new Point(eyeRect.X, topThreshold), new Point(eyeRect.X + eyeWidth, topThreshold), new MCvScalar(0, 0, 255), 2);
                             CvInvoke.Line(image, new Point(eyeRect.X, bottomThreshold), new Point(eyeRect.X + eyeWidth, bottomThreshold), new MCvScalar(0, 0, 255), 2);
                         }
+
+                        return direction;
                     }
                 }
             }
@@ -286,6 +319,8 @@ namespace GazeTrackingEmgu
             {
                 Console.WriteLine("Error while detecting gaze direction: " + ex.Message);
             }
+
+            return "away";
         }
 
         private void toggleBoundingBoxesToolStripMenuItem_Click(object sender, EventArgs e)
@@ -293,5 +328,34 @@ namespace GazeTrackingEmgu
             showBoundingBoxes = !showBoundingBoxes;
             toggleBoundingBoxesToolStripMenuItem.Text = showBoundingBoxes ? "Hide boxes" : "Show boxes";
         }
+
+        private Dictionary<int, string> LoadGazeData(string csvPath)
+        {
+            Dictionary<int, string> gazeData = new Dictionary<int, string>();
+           
+            using (StreamReader sr = new StreamReader(csvPath))
+            {
+                sr.ReadLine();
+
+                string line;
+                while ((line = sr.ReadLine()) != null)
+                {
+                    line = line.Trim().Trim('"');
+                    string[] parts = line.Split(',');
+
+                    string frameString = parts[0].Trim().Trim('"');
+                    string gazeDirection = parts[1].Trim().Trim('"').ToLower(); 
+                    int frame = int.Parse(frameString);
+
+                    gazeData[frame] = gazeDirection;
+
+                    Console.WriteLine($"Loaded: Frame {frame} -> {gazeDirection}");
+                }
+            }
+            return gazeData;
+        }
+
+
+
     }
 }

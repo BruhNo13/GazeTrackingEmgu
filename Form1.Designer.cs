@@ -35,8 +35,10 @@
             startToolStripMenuItem = new ToolStripMenuItem();
             stopToolStripMenuItem = new ToolStripMenuItem();
             pauseToolStripMenuItem = new ToolStripMenuItem();
+            playVideoToolStripMenuItem = new ToolStripMenuItem();
             optionsToolStripMenuItem = new ToolStripMenuItem();
             toggleBoundingBoxesToolStripMenuItem = new ToolStripMenuItem();
+            textBoxGazeStatus = new TextBox();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             menuStrip1.SuspendLayout();
             SuspendLayout();
@@ -60,7 +62,7 @@
             // 
             // fileToolStripMenuItem
             // 
-            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { cameraToolStripMenuItem });
+            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { cameraToolStripMenuItem, playVideoToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new Size(37, 20);
             fileToolStripMenuItem.Text = "File";
@@ -92,6 +94,13 @@
             pauseToolStripMenuItem.Size = new Size(105, 22);
             pauseToolStripMenuItem.Text = "Pause";
             // 
+            // playVideoToolStripMenuItem
+            // 
+            playVideoToolStripMenuItem.Name = "playVideoToolStripMenuItem";
+            playVideoToolStripMenuItem.Size = new Size(180, 22);
+            playVideoToolStripMenuItem.Text = "Play Video";
+            playVideoToolStripMenuItem.Click += playVideoToolStripMenuItem_Click;
+            // 
             // optionsToolStripMenuItem
             // 
             optionsToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { toggleBoundingBoxesToolStripMenuItem });
@@ -106,11 +115,20 @@
             toggleBoundingBoxesToolStripMenuItem.Text = "Toggle bounding boxes";
             toggleBoundingBoxesToolStripMenuItem.Click += toggleBoundingBoxesToolStripMenuItem_Click;
             // 
+            // textBoxGazeStatus
+            // 
+            textBoxGazeStatus.Location = new Point(197, 34);
+            textBoxGazeStatus.Name = "textBoxGazeStatus";
+            textBoxGazeStatus.ReadOnly = true;
+            textBoxGazeStatus.Size = new Size(371, 23);
+            textBoxGazeStatus.TabIndex = 2;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(textBoxGazeStatus);
             Controls.Add(pictureBox1);
             Controls.Add(menuStrip1);
             MainMenuStrip = menuStrip1;
@@ -134,5 +152,7 @@
         private ToolStripMenuItem pauseToolStripMenuItem;
         private ToolStripMenuItem optionsToolStripMenuItem;
         private ToolStripMenuItem toggleBoundingBoxesToolStripMenuItem;
+        private ToolStripMenuItem playVideoToolStripMenuItem;
+        private TextBox textBoxGazeStatus;
     }
 }

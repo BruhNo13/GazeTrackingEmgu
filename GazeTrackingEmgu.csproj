@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <Folder Include="haarcascades\" />
+    <Folder Include="videos\" />
   </ItemGroup>
 
   <ItemGroup>
